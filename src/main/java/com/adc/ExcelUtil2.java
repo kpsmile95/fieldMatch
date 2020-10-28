@@ -67,8 +67,6 @@ public class ExcelUtil2 {
 
             rows = new ArrayList<>();
 
-
-
             //获取当前id对应得所有款型
             if (!(zppKx == null || zppKx.isEmpty())) {
                 for (int j = 0; j < ggNum; j++) {
@@ -138,15 +136,22 @@ public class ExcelUtil2 {
 
     private static boolean validate(int i, String qczj, String gg) {
         boolean flag = false;
-        if (!qczj.contains("-") && !gg.contains("-")) {
+        if (!qczj.equals("-") && !gg.equals("-")) {
             String[] qczjs = qczj.split(";");
+            String[] ggs = gg.split(";");
             for (String qc : qczjs) {
-                if (gg.contains(qc)) {
-                    flag = true;
+                for (String g : ggs) {
+                    if (qc.equals(g)) {
+                        flag = true;
+                        break;
+                    }
+                }
+                if (flag) {
+                    break;
                 }
             }
         }
-        if (qczj.contains("-") || gg.contains("-")) {
+        if (qczj.equals("-") || gg.equals("-")) {
             flag = true;
         }
         return flag;
