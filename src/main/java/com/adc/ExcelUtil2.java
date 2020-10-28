@@ -9,10 +9,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @Author wangmian
@@ -20,7 +17,8 @@ import java.util.Map;
  */
 public class ExcelUtil2 {
 
-    private static Map<Integer, String> errorMap = new HashMap<Integer, String>(){{
+    //报错类型
+    private static Map<Integer, String> errorMap = new HashMap<Integer, String>() {{
         put(0, "Error_chang");
         put(1, "Error_kuan");
         put(2, "Error_gao");
@@ -32,8 +30,8 @@ public class ExcelUtil2 {
         put(8, "Error_edzk");
     }};
 
-    /* 打开对应的Excel文件 */
-    public static XSSFWorkbook validateFile(String fileQCZJ,String fileGG,List<Integer> itemRank) throws IOException {
+    //对数据进行校验
+    public static XSSFWorkbook validateFile(String fileQCZJ, String fileGG, List<Integer> itemRank) throws IOException {
         FileInputStream fisQCZJ = new FileInputStream(new File(fileQCZJ));
         FileInputStream fisGG = new FileInputStream(new File(fileGG));
 
@@ -43,10 +41,10 @@ public class ExcelUtil2 {
         XSSFSheet sheetQCZJ = workbookQCZJ.getSheetAt(0);
         XSSFSheet sheetGG = workbookGG.getSheetAt(0);
 
-        return validate(sheetQCZJ, sheetGG,itemRank);
+        return validate(sheetQCZJ, sheetGG, itemRank);
     }
 
-    private static XSSFWorkbook validate(XSSFSheet sheetQCZJ,XSSFSheet sheetGG,List<Integer> itemRank){
+    private static XSSFWorkbook validate(XSSFSheet sheetQCZJ, XSSFSheet sheetGG, List<Integer> itemRank) {
         int qczjNum = sheetQCZJ.getLastRowNum();
         int ggNum = sheetGG.getLastRowNum();
         XSSFWorkbook workbook = new XSSFWorkbook();
@@ -69,12 +67,9 @@ public class ExcelUtil2 {
 
             rows = new ArrayList<>();
 
-            XSSFRow row1 = sheet.createRow(rowNum);
-            row1.createCell(0).setCellValue(rowQC.getCell(0).getStringCellValue());
-            row1.createCell(2).setCellValue("");
-            row1.createCell(3).setCellValue(LocalDateTime.now().toString());
-            rowNum++;
 
+
+            //获取当前id对应得所有款型
             if (!(zppKx == null || zppKx.isEmpty())) {
                 for (int j = 0; j < ggNum; j++) {
                     rowGG = sheetGG.getRow(j + 1);
@@ -88,53 +83,89 @@ public class ExcelUtil2 {
 
                 }
             }
+            //若是当前id对应得款型没有数据则报错
             if (rows.isEmpty()) {
+                XSSFRow row1 = sheet.createRow(rowNum);
+                row1.createCell(0).setCellValue(rowQC.getCell(0).getStringCellValue());
+                row1.createCell(2).setCellValue("");
+                row1.createCell(3).setCellValue(LocalDateTime.now().toString());
+                rowNum++;
                 row1.getCell(2).setCellValue("Error_zpp");
                 continue;
             }
-
+            //循环匹配，检验每条数据，记录每条数据匹配到得最大的列
             Row finalRow = null;
             List<Integer> matchNum = new ArrayList<>();
-            for (Row row2 : rows) {
-
+            for (int j = 0; j < rows.size(); j++) {
+                Row cells = rows.get(j);
+                for (int k = 0; k < itemRank.size(); k++) {
+                    Integer integer = itemRank.get(k);
+                    if (!validateByRank(integer, rowQC, cells)) {
+                        matchNum.add(integer);
+                        break;
+                    }
+                    if (k == 8) {
+                        matchNum.add(9);
+                    }
+                }
+            }
+            Integer max = Collections.max(matchNum);
+            int index = matchNum.indexOf(max);
+            finalRow = rows.get(index);
+            if (max == 9) {
+                for (int j = 0; j < matchNum.size(); j++) {
+                    if (matchNum.get(j) == 9) {
+                        finalRow = rows.get(j);
+                        XSSFRow row1 = sheet.createRow(rowNum);
+                        row1.createCell(0).setCellValue(rowQC.getCell(0).getStringCellValue());
+                        row1.createCell(2).setCellValue("");
+                        row1.createCell(3).setCellValue(LocalDateTime.now().toString());
+                        rowNum++;
+                        row1.createCell(1).setCellValue(finalRow.getCell(0).getStringCellValue());
+                    }
+                }
+            } else {
+                XSSFRow row1 = sheet.createRow(rowNum);
+                row1.createCell(0).setCellValue(rowQC.getCell(0).getStringCellValue());
+                row1.createCell(2).setCellValue("");
+                row1.createCell(3).setCellValue(LocalDateTime.now().toString());
+                rowNum++;
+                row1.getCell(2).setCellValue(errorMap.get(max));
             }
         }
         return workbook;
     }
 
-    private static boolean validate(int i,String qczj, String gg, Row row){
+    private static boolean validate(int i, String qczj, String gg) {
         boolean flag = false;
         if (!qczj.contains("-") && !gg.contains("-")) {
             String[] qczjs = qczj.split(";");
             for (String qc : qczjs) {
-                if (!gg.contains(qc)) {
-                    row.getCell(2).setCellValue(errorMap.get(i));
+                if (gg.contains(qc)) {
                     flag = true;
                 }
             }
         }
+        if (qczj.contains("-") || gg.contains("-")) {
+            flag = true;
+        }
         return flag;
     }
 
-    private static String validateByRank(int i, Row rowQC, Row rowGG, Row row) {
+    private static boolean validateByRank(int i, Row rowQC, Row rowGG) {
         String qczj = null;
         String gg = null;
 
-        boolean flag = false;
+        boolean validate = false;
 
         for (int j = 0; j < 9; j++) {
-            flag = false;
             if (i == j) {
                 qczj = rowQC.getCell(j + 2).getStringCellValue();
                 gg = rowGG.getCell(j + 2).getStringCellValue();
-                flag = validate(i,qczj, gg, row);
+                validate = validate(i, qczj, gg);
                 break;
             }
         }
-        String error = "";
-        if (flag) {
-            error = errorMap.get(i);
-        }
-        return error;
+        return validate;
     }
 }
